@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — Keirav Shah</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="subpage" style="background-color:#e8e3f5">
+  <canvas id="pond"></canvas>
+
+  <div class="page-wrapper">
+    <nav class="page-nav">
+      <a href="index.html" class="site-name">Keirav Shah</a>
+      <ul class="page-nav-links">
+        <li><a href="about.html"     class="nav-link nav-link--active nav--lavender">About</a></li>
+        <li><a href="education.html" class="nav-link nav--mint">Education</a></li>
+        <li><a href="projects.html"  class="nav-link nav--peach">Projects</a></li>
+        <li><a href="contact.html"   class="nav-link nav--sky">Contact</a></li>
+      </ul>
+    </nav>
+
+    <div class="page-content">
+      <h1 class="page-title">About Me</h1>
+
+      <section class="about-section">
+        <p class="about-bio">
+          Hi, I'm Keirav — a recent graduate with a curiosity for building things
+          that sit at the intersection of technology and creativity. I enjoy working
+          on problems that are messy to start with and clean by the end.
+        </p>
+      </section>
+
+      <section class="about-section">
+        <h2 class="section-label">Education</h2>
+        <p class="about-meta">
+          BSc Computer Science · Newcastle University, UK<br/>
+          <span class="text-muted">Graduated with First Class Honours | 2025</span>
+        </p>
+        <p class="about-meta">
+          International Baccalaureate Diploma · UWC Changshu, China<br/>
+          <span class="text-muted">HL Math, Physics, Design Tech | 2020</span>
+        </p>
+      </section>
+
+      <section class="about-section">
+        <h2 class="section-label">Interests</h2>
+        <div class="interest-tags">
+          <!-- Replace these with your own -->
+          <span class="tag">Technology</span>
+          <span class="tag">Design</span>
+          <span class="tag">Music</span>
+          <span class="tag">Outdoors</span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="pond.js"></script>
+  <script src="transitions.js"></script>
+  <script>SiteTransitions.init('#e8e3f5');</script>
+</body>
+</html>

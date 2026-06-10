@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Keirav Shah</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="pond"></canvas>
+
+  <main>
+    <section class="hero">
+      <h1>Keirav Shah</h1>
+      <p class="tagline">Just building things.</p>
+    </section>
+
+    <nav class="cards">
+      <a href="about.html" class="card card--lavender">
+        <span class="card-icon">✦</span>
+        <h2>About Me</h2>
+        <p>Who I am and what I'm working towards.</p>
+      </a>
+
+      <a href="education.html" class="card card--mint">
+        <span class="card-icon">◈</span>
+        <h2>Education</h2>
+        <p>My academic background and what I've studied.</p>
+      </a>
+
+      <a href="projects.html" class="card card--peach">
+        <span class="card-icon">◆</span>
+        <h2>Projects</h2>
+        <p>Things I've built and experiments I've run.</p>
+      </a>
+
+      <a href="contact.html" class="card card--sky">
+        <span class="card-icon">◉</span>
+        <h2>Contact</h2>
+        <p>Get in touch — I'd love to hear from you.</p>
+      </a>
+    </nav>
+  </main>
+
+  <script src="pond.js"></script>
+  <script>
+    (function () {
+      let navigating = false;
+
+      document.querySelectorAll('.card').forEach(card => {
+        card.addEventListener('click', e => {
+          e.preventDefault();
+          if (navigating) return;
+          navigating = true;
+
+          const href = card.getAttribute('href');
+          const rect = card.getBoundingClientRect();
+          const bg = getComputedStyle(card).backgroundColor;
+
+          const overlay = document.createElement('div');
+          Object.assign(overlay.style, {
+            position: 'fixed',
+            top: rect.top + 'px',
+            left: rect.left + 'px',
+            width: rect.width + 'px',
+            height: rect.height + 'px',
+            borderRadius: '1.25rem',
+            backgroundColor: bg,
+            zIndex: '100',
+            pointerEvents: 'none',
+            transition: [
+              'top 0.45s cubic-bezier(0.4,0,0.2,1)',
+              'left 0.45s cubic-bezier(0.4,0,0.2,1)',
+              'width 0.45s cubic-bezier(0.4,0,0.2,1)',
+              'height 0.45s cubic-bezier(0.4,0,0.2,1)',
+              'border-radius 0.45s cubic-bezier(0.4,0,0.2,1)',
+            ].join(', '),
+          });
+          document.body.appendChild(overlay);
+
+          // Double rAF ensures the initial position paints before the transition fires
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              Object.assign(overlay.style, {
+                top: '0', left: '0',
+                width: '100vw', height: '100vh',
+                borderRadius: '0',
+              });
+            });
+          });
+
+          setTimeout(() => { window.location.href = href; }, 460);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

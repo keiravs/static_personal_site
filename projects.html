@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Projects — Keirav Shah</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="subpage" style="background-color:#fde8dc">
+  <canvas id="pond"></canvas>
+
+  <div class="page-wrapper">
+    <nav class="page-nav">
+      <a href="index.html" class="site-name">Keirav Shah</a>
+      <ul class="page-nav-links">
+        <li><a href="about.html"     class="nav-link nav--lavender">About</a></li>
+        <li><a href="education.html" class="nav-link nav--mint">Education</a></li>
+        <li><a href="projects.html"  class="nav-link nav-link--active nav--peach">Projects</a></li>
+        <li><a href="contact.html"   class="nav-link nav--sky">Contact</a></li>
+      </ul>
+    </nav>
+
+    <div class="page-content page-content--wide">
+      <h1 class="page-title">Projects</h1>
+
+      <div class="project-grid">
+
+        <a href="flights.html" class="project-tile" style="text-decoration:none;color:inherit">
+          <span class="project-year">2026</span>
+          <h2 class="project-title">Flight Tracker</h2>
+          <p class="project-desc">
+            Log every flight I've taken and watch the routes arc across a 3D
+            globe, with a running tally of total distance flown.
+          </p>
+          <div class="project-tags">
+            <span class="project-tag">Django</span>
+            <span class="project-tag">globe.gl</span>
+            <span class="project-tag">three.js</span>
+          </div>
+        </a>
+
+        <!-- Placeholder projects — swap these out for your own -->
+        <article class="project-tile">
+          <span class="project-year">2025</span>
+          <h2 class="project-title">Pond</h2>
+          <p class="project-desc">
+            An interactive generative canvas of drifting ripples that reacts to
+            the cursor. Built as a calm, ambient backdrop for this site.
+          </p>
+          <div class="project-tags">
+            <span class="project-tag">JavaScript</span>
+            <span class="project-tag">Canvas API</span>
+          </div>
+        </article>
+
+        <article class="project-tile">
+          <span class="project-year">2025</span>
+          <h2 class="project-title">Arkive</h2>
+          <p class="project-desc">
+            A personal knowledge archive for capturing notes, links and
+            half-finished ideas, with full-text search across everything.
+          </p>
+          <div class="project-tags">
+            <span class="project-tag">Django</span>
+            <span class="project-tag">Python</span>
+            <span class="project-tag">SQLite</span>
+          </div>
+        </article>
+
+        <article class="project-tile">
+          <span class="project-year">2024</span>
+          <h2 class="project-title">Tideline</h2>
+          <p class="project-desc">
+            A weather companion that turns daily forecasts into simple,
+            colour-coded cards so you can plan a week at a glance.
+          </p>
+          <div class="project-tags">
+            <span class="project-tag">React</span>
+            <span class="project-tag">TypeScript</span>
+            <span class="project-tag">REST API</span>
+          </div>
+        </article>
+
+        <article class="project-tile">
+          <span class="project-year">2024</span>
+          <h2 class="project-title">Metronome</h2>
+          <p class="project-desc">
+            A minimalist habit tracker that keeps a steady beat — small daily
+            streaks, gentle nudges, no clutter.
+          </p>
+          <div class="project-tags">
+            <span class="project-tag">Flutter</span>
+            <span class="project-tag">Dart</span>
+          </div>
+        </article>
+
+        <article class="project-tile">
+          <span class="project-year">2023</span>
+          <h2 class="project-title">Lantern</h2>
+          <p class="project-desc">
+            A study-group matcher for university modules that pairs students by
+            topic, schedule and preferred working style.
+          </p>
+          <div class="project-tags">
+            <span class="project-tag">Node.js</span>
+            <span class="project-tag">PostgreSQL</span>
+          </div>
+        </article>
+
+        <article class="project-tile">
+          <span class="project-year">2023</span>
+          <h2 class="project-title">Foldspace</h2>
+          <p class="project-desc">
+            An origami pattern visualiser that animates crease patterns folding
+            flat — a small experiment in geometry and SVG.
+          </p>
+          <div class="project-tags">
+            <span class="project-tag">SVG</span>
+            <span class="project-tag">JavaScript</span>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="pond.js"></script>
+  <script src="transitions.js"></script>
+  <script>SiteTransitions.init('#fde8dc');</script>
+</body>
+</html>

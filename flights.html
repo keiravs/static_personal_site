@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flights — Keirav Shah</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="subpage flights-full">
+  <div id="globe"></div>
+  <div class="globe-loading" id="globe-loading">Loading flight paths…</div>
+
+  <nav class="page-nav page-nav--overlay">
+    <a href="index.html" class="site-name">Keirav Shah</a>
+    <ul class="page-nav-links">
+      <li><a href="about.html"     class="nav-link nav--lavender">About</a></li>
+      <li><a href="education.html" class="nav-link nav--mint">Education</a></li>
+      <li><a href="projects.html"  class="nav-link nav--peach">Projects</a></li>
+      <li><a href="contact.html"   class="nav-link nav--sky">Contact</a></li>
+    </ul>
+  </nav>
+
+  <aside class="globe-panel">
+    <div class="globe-panel-head">
+      <div class="big" id="overlay-km">—</div>
+      <div class="big-label">kilometres flown</div>
+    </div>
+
+    <div class="flight-stats" id="flight-stats"><!-- filled by JS --></div>
+
+    <div class="routes-view" id="routes-view"><!-- routes list / route detail, filled by JS --></div>
+  </aside>
+
+  <script src="transitions.js"></script>
+  <script>SiteTransitions.init('#05060a');</script>
+
+  <!-- globe.gl (three.js-based) — drop-in, no build step -->
+  <script src="https://unpkg.com/globe.gl"></script>
+  <script>
+    
+    // const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname)
+    //  ? 'http://localhost' 
+    //  : 'https://api.keirav.com';
+    const API_BASE = 'https://api.keirav.com';
+
+    const ARC_COLORS = ['#f4bfa3', '#c4b8ea'];   // peach → lavender, brand accents
+    const fmt = n => Math.round(n).toLocaleString('en-GB');
+
+    let world = null;        // the globe.gl instance, so selection can re-filter arcs
+    let allRoutes = [];      // every route, as returned by the API
+
+    // Stable id for a route from its (sorted) endpoint codes.
+    const routeKey = r => `${r.airports[0].iata}-${r.airports[1].iata}`;
+
+    function buildArcs(routes) {
+      // One arc per distinct route (not per flight). A route flown both ways is a
+      // single arc; how often it's flown is shown in the label and as extra thickness.
+      const arcs = [];
+      for (const r of routes) {
+        const [a, b] = r.airports;
+        const times = r.times_flown > 1 ? ` · ×${r.times_flown}` : '';
+        const base = {
+          startLat: a.lat,  startLng: a.lon,
+          endLat:   b.lat,  endLng: b.lon,
+          times: r.times_flown,
+          routeKey: routeKey(r),
+          label: `${a.iata} ↔ ${b.iata} · ${fmt(r.distance_km)} km${times}`,
+        };
+        arcs.push({ ...base, glow: true });    // soft wide halo, drawn first
+        arcs.push({ ...base, glow: false });   // bright solid core on top
+      }
+      return arcs;
+    }
+
+    // More-flown routes read a little bolder; capped so a heavy route stays tasteful.
+    const arcStroke = d => (d.glow ? 2.6 : 0.65) * (1 + Math.min(d.times - 1, 4) * 0.22);
+
+    function buildPoints(routes) {
+      const seen = new Map();
+      for (const r of routes) {
+        for (const a of r.airports) {
+          if (!seen.has(a.iata)) {
+            seen.set(a.iata, { lat: a.lat, lng: a.lon, label: `${a.iata} — ${a.city}` });
+          }
+        }
+      }
+      return [...seen.values()];
+    }
+
+    function renderGlobe(routes) {
+      const el = document.getElementById('globe');
+      world = Globe()(el)
+        .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
+        .backgroundColor('rgba(0,0,0,0)')
+        .atmosphereColor('#9db4d8')
+        .atmosphereAltitude(0.18)
+        .arcsData(buildArcs(routes))
+        .arcColor(d => d.glow ? 'rgba(196, 184, 234, 0.16)' : ARC_COLORS)
+        .arcStroke(arcStroke)
+        .arcDashLength(1)        // solid — no dashes
+        .arcDashGap(0)
+        .arcDashAnimateTime(0)   // static — no animation
+        .arcLabel('label')
+        .onArcClick(d => d.routeKey && selectRoute(d.routeKey))
+        .pointsData(buildPoints(routes))
+        .pointColor(() => '#ffffff')
+        .pointAltitude(0.01)
+        .pointRadius(0.28)
+        .pointLabel('label');
+
+      world.controls().autoRotate = true;
+      world.controls().autoRotateSpeed = 0.6;
+
+      // globe sized to the viewport
+      const resize = () => world.width(el.clientWidth).height(el.clientHeight);
+      resize();
+      window.addEventListener('resize', resize);
+    }
+
+    // Show every route's arc + airport; used on load and when leaving a route.
+    function showAllRoutes() {
+      world.arcsData(buildArcs(allRoutes)).pointsData(buildPoints(allRoutes));
+      world.controls().autoRotate = true;
+      renderRoutes();
+    }
+
+    // Focus a single route: only its arc + endpoints, swing the camera to it,
+    // and replace the sidebar list with the per-flight detail.
+    function selectRoute(key) {
+      const route = allRoutes.find(r => routeKey(r) === key);
+      if (!route) return;
+      const [a, b] = route.airports;
+      world.arcsData(buildArcs([route])).pointsData(buildPoints([route]));
+      world.controls().autoRotate = false;
+      world.pointOfView({ lat: (a.lat + b.lat) / 2, lng: (a.lon + b.lon) / 2, altitude: 1.8 }, 800);
+      renderRouteDetail(route);
+    }
+
+    function renderStats(s) {
+      document.getElementById('overlay-km').textContent = fmt(s.total_km);
+      const cells = [
+        [fmt(s.total_km), 'km flown'],
+        [s.count, 'flights'],
+        [s.routes, 'routes'],
+        [s.airports, 'airports'],
+        [s.countries, 'countries'],
+        [s.times_around_earth + '×', 'around the Earth'],
+        [s.longest ? fmt(s.longest.distance_km) + ' km' : '—', 'longest flight'],
+      ];
+      document.getElementById('flight-stats').innerHTML = cells.map(
+        ([num, label]) => `<div class="stat"><div class="stat-num">${num}</div><div class="stat-label">${label}</div></div>`
+      ).join('');
+    }
+
+    const view = () => document.getElementById('routes-view');
+
+    // Sidebar for distinct routes with most-flown first. Each row selects its route.
+    function renderRoutes() {
+      const rows = [...allRoutes]
+        .sort((x, y) => y.times_flown - x.times_flown || y.distance_km - x.distance_km)
+        .map(r => {
+          const [a, b] = r.airports;
+          return `
+            <li class="route-item" data-key="${routeKey(r)}">
+              <span class="route-pair">${a.iata} ↔ ${b.iata}
+                <span>${a.city} – ${b.city}</span>
+              </span>
+              <span class="route-meta">
+                <span class="route-times">×${r.times_flown}</span>
+                <span class="route-dist">${fmt(r.distance_km)} km</span>
+              </span>
+            </li>`;
+        }).join('');
+      view().innerHTML = `<h2 class="section-label">Routes</h2><ul class="route-list">${rows}</ul>`;
+      view().querySelectorAll('.route-item').forEach(li =>
+        li.addEventListener('click', () => selectRoute(li.dataset.key)));
+    }
+
+    // Sidebar for route's flights - each as card ordered by newest first
+    function renderRouteDetail(route) {
+      const [a, b] = route.airports;
+      const cards = [...route.flights].reverse().map(f => {
+        const meta = [f.airline, f.flight_number, f.aircraft].filter(Boolean).join(' · ');
+        return `
+          <li class="flight-card">
+            <div class="fcard-top">
+              <span class="fcard-route">${f.origin} → ${f.destination}</span>
+            </div>
+            <div class="fcard-date">${f.date}</div>
+            ${meta ? `<div class="fcard-meta">${meta}</div>` : ''}
+          </li>`;
+      }).join('');
+      view().innerHTML = `
+        <button class="route-back" id="route-back">← All routes</button>
+        <div class="route-detail-head">
+          <div class="route-detail-title">${a.iata} ↔ ${b.iata}</div>
+          <div class="route-detail-sub">${a.city} – ${b.city} · ${fmt(route.distance_km)} km each way · flown ×${route.times_flown}</div>
+        </div>
+        <ul class="flight-cards">${cards}</ul>`;
+      document.getElementById('route-back').addEventListener('click', showAllRoutes);
+    }
+
+    fetch(`${API_BASE}/api/flights/`)
+      .then(r => r.json())
+      .then(({ routes, stats }) => {
+        document.getElementById('globe-loading').remove();
+        allRoutes = routes;
+        renderGlobe(routes);
+        renderStats(stats);
+        renderRoutes();
+      })
+      .catch(err => {
+        document.getElementById('globe-loading').textContent =
+          'Could not load flights — is the API running?';
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
