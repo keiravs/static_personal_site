@@ -24,6 +24,7 @@
   </nav>
 
   <aside class="globe-panel">
+    <div class="sheet-handle" id="sheet-handle" aria-hidden="true"></div>
     <div class="globe-panel-head">
       <div class="big" id="overlay-km">—</div>
       <div class="big-label">kilometres flown</div>
@@ -188,6 +189,92 @@
       document.getElementById('route-back').addEventListener('click', showAllRoutes);
     }
 
+    (function initSheet() {
+      const panel  = document.querySelector('.globe-panel');
+      const handle = document.getElementById('sheet-handle');
+      const head   = document.querySelector('.globe-panel-head');
+      const mq = window.matchMedia('(max-width: 700px)');
+
+      let snaps = { open: 0, peek: 0, bar: 0 };   // translateY offset per state
+      let state = 'peek';
+
+      // Visible height when collapsed = handle strip; when peeking = handle + header.
+      function measure() {
+        const styles = getComputedStyle(panel);
+        const padTop = parseFloat(styles.paddingTop) || 0;
+        const barPeek  = padTop + handle.offsetHeight + 14;
+        const headPeek = padTop + handle.offsetHeight + head.offsetHeight + 22;
+        const h = panel.offsetHeight;
+        snaps = {
+          open: 0,
+          peek: Math.max(0, h - headPeek),
+          bar:  Math.max(0, h - barPeek),
+        };
+      }
+
+      function apply() {
+        if (!mq.matches) { panel.style.removeProperty('--sheet-y'); return; }
+        panel.style.setProperty('--sheet-y', snaps[state] + 'px');
+      }
+
+      function setState(s) { state = s; measure(); apply(); }
+
+      // Drag handling via pointer events (covers touch + mouse).
+      let dragging = false, moved = false, startY = 0, startOffset = 0;
+
+      handle.addEventListener('pointerdown', e => {
+        if (!mq.matches) return;
+        dragging = true;
+        moved = false;
+        startY = e.clientY;
+        measure();
+        startOffset = snaps[state];
+        panel.classList.add('is-dragging');
+        handle.setPointerCapture(e.pointerId);
+      });
+
+      handle.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        if (Math.abs(e.clientY - startY) > 4) moved = true;
+        const y = Math.min(snaps.bar, Math.max(0, startOffset + (e.clientY - startY)));
+        panel.style.setProperty('--sheet-y', y + 'px');
+      });
+
+      function endDrag(e) {
+        if (!dragging) return;
+        dragging = false;
+        panel.classList.remove('is-dragging');
+        if (e && e.pointerId != null && handle.hasPointerCapture(e.pointerId)) {
+          handle.releasePointerCapture(e.pointerId);
+        }
+
+        const y = parseFloat(getComputedStyle(panel).getPropertyValue('--sheet-y')) || 0;
+        let best = 'peek', dist = Infinity;
+        for (const s of ['open', 'peek', 'bar']) {
+          const d = Math.abs(snaps[s] - y);
+          if (d < dist) { dist = d; best = s; }
+        }
+        setState(best);
+      }
+      handle.addEventListener('pointerup', endDrag);
+      handle.addEventListener('pointercancel', endDrag);
+
+      handle.addEventListener('click', () => {
+        if (!mq.matches || moved) return;
+        const order = ['bar', 'peek', 'open'];
+        const next = order[Math.min(order.indexOf(state) + 1, order.length - 1)];
+        setState(next);
+      });
+
+      window.addEventListener('resize', () => { measure(); apply(); });
+      mq.addEventListener('change', () => setState(mq.matches ? 'peek' : 'open'));
+
+      // Re-measure once the routes list has populated (panel height changes).
+      window.sheetReflow = () => { if (mq.matches) setState(state); };
+
+      apply();
+    })();
+  
     fetch(`${API_BASE}/api/flights/`)
       .then(r => r.json())
       .then(({ routes, stats }) => {
@@ -196,6 +283,7 @@
         renderGlobe(routes);
         renderStats(stats);
         renderRoutes();
+        if (window.sheetReflow) window.sheetReflow();
       })
       .catch(err => {
         document.getElementById('globe-loading').textContent =
