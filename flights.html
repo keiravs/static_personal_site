@@ -30,27 +30,35 @@
       <div class="big-label">kilometres flown</div>
     </div>
 
-    <div class="flight-stats" id="flight-stats"><!-- filled (programmatically filled) --></div>
+    <div class="flight-stats" id="flight-stats"><!-- filled by JS --></div>
 
-    <div class="routes-view" id="routes-view"><!-- routes list / route detail (programmatically filled) --></div>
+    <div class="routes-view" id="routes-view"><!-- routes list / route detail, filled by JS --></div>
   </aside>
 
   <script src="transitions.js"></script>
   <script>SiteTransitions.init('#05060a');</script>
 
+  <!-- globe.gl (three.js-based) — drop-in, no build step -->
   <script src="https://unpkg.com/globe.gl"></script>
   <script>
+    
+    // const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname)
+    //  ? 'http://localhost' 
+    //  : 'https://api.keirav.com';
     const API_BASE = 'https://api.keirav.com';
 
-    const ARC_COLORS = ['#f4bfa3', '#c4b8ea'];
+    const ARC_COLORS = ['#f4bfa3', '#c4b8ea'];   // peach → lavender, brand accents
     const fmt = n => Math.round(n).toLocaleString('en-GB');
 
-    let world = null;
-    let allRoutes = [];
+    let world = null;        // the globe.gl instance, so selection can re-filter arcs
+    let allRoutes = [];      // every route, as returned by the API
 
+    // Stable id for a route from its (sorted) endpoint codes.
     const routeKey = r => `${r.airports[0].iata}-${r.airports[1].iata}`;
 
     function buildArcs(routes) {
+      // One arc per distinct route (not per flight). A route flown both ways is a
+      // single arc; how often it's flown is shown in the label and as extra thickness.
       const arcs = [];
       for (const r of routes) {
         const [a, b] = r.airports;
@@ -62,12 +70,13 @@
           routeKey: routeKey(r),
           label: `${a.iata} ↔ ${b.iata} · ${fmt(r.distance_km)} km${times}`,
         };
-        arcs.push({ ...base, glow: true });
-        arcs.push({ ...base, glow: false });
+        arcs.push({ ...base, glow: true });    // soft wide halo, drawn first
+        arcs.push({ ...base, glow: false });   // bright solid core on top
       }
       return arcs;
     }
 
+    // More-flown routes read a little bolder; capped so a heavy route stays tasteful.
     const arcStroke = d => (d.glow ? 2.6 : 0.65) * (1 + Math.min(d.times - 1, 4) * 0.22);
 
     function buildPoints(routes) {
@@ -92,9 +101,9 @@
         .arcsData(buildArcs(routes))
         .arcColor(d => d.glow ? 'rgba(196, 184, 234, 0.16)' : ARC_COLORS)
         .arcStroke(arcStroke)
-        .arcDashLength(1)
+        .arcDashLength(1)        // solid — no dashes
         .arcDashGap(0)
-        .arcDashAnimateTime(0)
+        .arcDashAnimateTime(0)   // static — no animation
         .arcLabel('label')
         .onArcClick(d => d.routeKey && selectRoute(d.routeKey))
         .pointsData(buildPoints(routes))
@@ -106,17 +115,21 @@
       world.controls().autoRotate = true;
       world.controls().autoRotateSpeed = 0.6;
 
+      // globe sized to the viewport
       const resize = () => world.width(el.clientWidth).height(el.clientHeight);
       resize();
       window.addEventListener('resize', resize);
     }
 
+    // Show every route's arc + airport; used on load and when leaving a route.
     function showAllRoutes() {
       world.arcsData(buildArcs(allRoutes)).pointsData(buildPoints(allRoutes));
       world.controls().autoRotate = true;
       renderRoutes();
     }
 
+    // Focus a single route: only its arc + endpoints, swing the camera to it,
+    // and replace the sidebar list with the per-flight detail.
     function selectRoute(key) {
       const route = allRoutes.find(r => routeKey(r) === key);
       if (!route) return;
@@ -145,6 +158,7 @@
 
     const view = () => document.getElementById('routes-view');
 
+    // Sidebar for distinct routes with most-flown first. Each row selects its route.
     function renderRoutes() {
       const rows = [...allRoutes]
         .sort((x, y) => y.times_flown - x.times_flown || y.distance_km - x.distance_km)
@@ -166,6 +180,7 @@
         li.addEventListener('click', () => selectRoute(li.dataset.key)));
     }
 
+    // Sidebar for route's flights - each as card ordered by newest first
     function renderRouteDetail(route) {
       const [a, b] = route.airports;
       const cards = [...route.flights].reverse().map(f => {
@@ -189,6 +204,12 @@
       document.getElementById('route-back').addEventListener('click', showAllRoutes);
     }
 
+    // ── Draggable bottom sheet (mobile only) ───────────────────────────────
+    // The info panel docks at the bottom on narrow screens. Without this it
+    // covers most of the globe, so make it draggable between three snap points:
+    //   open  — full panel, scrollable
+    //   peek  — just the "km flown" header showing (the default)
+    //   bar   — only the grab handle, globe fully visible
     (function initSheet() {
       const panel  = document.querySelector('.globe-panel');
       const handle = document.getElementById('sheet-handle');
@@ -247,7 +268,7 @@
         if (e && e.pointerId != null && handle.hasPointerCapture(e.pointerId)) {
           handle.releasePointerCapture(e.pointerId);
         }
-
+        // Snap to whichever point the sheet ended up nearest.
         const y = parseFloat(getComputedStyle(panel).getPropertyValue('--sheet-y')) || 0;
         let best = 'peek', dist = Infinity;
         for (const s of ['open', 'peek', 'bar']) {
@@ -259,6 +280,7 @@
       handle.addEventListener('pointerup', endDrag);
       handle.addEventListener('pointercancel', endDrag);
 
+      // Tapping the handle (no real drag) steps the sheet one notch upward.
       handle.addEventListener('click', () => {
         if (!mq.matches || moved) return;
         const order = ['bar', 'peek', 'open'];
@@ -274,7 +296,7 @@
 
       apply();
     })();
-  
+
     fetch(`${API_BASE}/api/flights/`)
       .then(r => r.json())
       .then(({ routes, stats }) => {
