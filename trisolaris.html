@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trisolaris — Keirav Shah</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="subpage trisolaris-full">
+  <div id="space"></div>
+
+  <nav class="page-nav page-nav--overlay">
+    <a href="index.html" class="site-name">Keirav Shah</a>
+    <ul class="page-nav-links">
+      <li><a href="about.html"     class="nav-link nav--lavender">About</a></li>
+      <li><a href="education.html" class="nav-link nav--mint">Education</a></li>
+      <li><a href="projects.html"  class="nav-link nav--peach">Projects</a></li>
+      <li><a href="contact.html"   class="nav-link nav--sky">Contact</a></li>
+    </ul>
+  </nav>
+
+  <aside class="tri-panel">
+    <div class="tri-era" id="tri-era">Stable Era</div>
+    <div class="tri-civ">Civilization <span id="tri-civ-num">137</span><span id="tri-civ-age"></span></div>
+    <div class="tri-temp" id="tri-temp">
+      <span class="tri-temp-num" id="tri-temp-num">—</span>
+      <span class="tri-temp-unit">°C · surface</span>
+    </div>
+    <div class="tri-event" id="tri-event"></div>
+  </aside>
+
+  <div class="tri-controls">
+    <button id="tri-info-btn" class="tri-btn tri-btn--info" aria-label="About this simulation">i</button>
+    <button id="tri-sound" class="tri-btn tri-btn--sound" aria-label="Toggle ambient sound">♪</button>
+    <input type="range" id="tri-vol" class="tri-vol" min="0" max="1" step="0.01" value="0.5" aria-label="Ambient volume" />
+    <button id="tri-pause" class="tri-btn" aria-label="Pause">⏸</button>
+    <input type="range" id="tri-speed" min="0" max="3" step="0.05" value="1" aria-label="Simulation speed" />
+  </div>
+
+  <aside class="tri-info" id="tri-info" aria-label="About this simulation">
+    <button class="tri-info-close" id="tri-info-close" aria-label="Close">×</button>
+    <h2>The Three-Body Problem</h2>
+    <p>
+      In the sky of Trisolaris hang three suns, bound in a dance no mind can
+      predict — the smallest difference grows until the future is unknowable.
+      What you are watching is that dance, truly unfolding. It has never
+      happened the same way twice.
+    </p>
+    <p>
+      For a time the suns move in harmony, and the planet knows a
+      <strong>Stable Era</strong> — warmth, seasons, a sky that can be trusted.
+      But harmony between three suns never lasts. When the dance unravels, the
+      <strong>Chaotic Era</strong> begins, and every sunrise becomes a gamble —
+      just as in Liu Cixin's <em>Remembrance of Earth's Past</em>.
+    </p>
+    <p>
+      The mint point is Trisolaris itself. Its surface burns and freezes with
+      the wandering of its suns — the temperature you see is the planet's
+      true reading — and its civilizations end the way the book says they do:
+    </p>
+    <ul class="tri-endings">
+      <li><span class="tri-ending-tag tag--fire">Destroyed by fire</span>
+        the planet wandered too near a sun, and the land burned.</li>
+      <li><span class="tri-ending-tag tag--ice">Froze in an endless night</span>
+        carried too far from all three suns, into a cold that does not end.</li>
+      <li><span class="tri-ending-tag tag--fire">Three suns rose at once</span>
+        a tri-solar day — three sunrises together, and nowhere to hide.</li>
+      <li><span class="tri-ending-tag tag--syzygy">Tri-solar syzygy</span>
+        the suns stand in a single line, and their pull tears the world's
+        surface away.</li>
+      <li><span class="tri-ending-tag tag--reset">A sun escaped into the deep</span>
+        sometimes the dance flings a sun into the dark — and those that remain
+        begin a new dance.</li>
+    </ul>
+    <p>
+      Each fallen civilization raises the count, and from the ruins a new one
+      rises to count the suns again. On Trisolaris, there has always been a
+      next civilization.
+    </p>
+    <h3 class="tri-chron-title">Chronicle of the Fallen</h3>
+    <ul class="tri-chronicle" id="tri-chronicle"></ul>
+    <div class="tri-hint">drag to look around · space pauses · slider sets time · ♪ toggles sound</div>
+  </aside>
+
+  <script src="transitions.js"></script>
+  <script>SiteTransitions.init('#030208');</script>
+
+  <!-- three.js as ES modules off unpkg — no build step. The sim itself is the
+       inline module below (inline modules still run when the page is opened
+       straight from disk; a local .js module file would be blocked by CORS). -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+    // ── Physics ────────────────────────────────────────────────────────────
+    // Real n-body gravity, integrated with velocity Verlet. Units are
+    // dimensionless: G = 1, each sun has mass ≈ 1, the figure-8 spans ~2 units.
+    const G = 1;
+    const SOFT2 = 0.004;            // Plummer softening² — tames close slingshots
+    const DT = 0.002;               // fixed step; speed varies the substep count
+    const SUBSTEPS_PER_FRAME = 8;   // at speed 1 (≈ one figure-8 orbit / 6.5 s)
+    const TRAIL_EVERY = 4;          // record a trail point every N substeps
+
+    // brand accents as stellar temperatures; trails use deeper versions of the
+    // same hues — pastels stack to white under additive blending
+    const SUN_STYLES = [
+      { core: '#fff1e2', corona: '#f4bfa3', trail: '#f0975e' },   // peach  — the warm sun
+      { core: '#f6f1ff', corona: '#c4b8ea', trail: '#9b83de' },   // lavender
+      { core: '#edf6ff', corona: '#a9cdec', trail: '#64a3de' },   // sky    — the cool sun
+    ];
+    const PLANET_TRAIL = '#7fcca6'; // mint — Trisolaris
+
+    // bodies[0..2] = suns, bodies[3] = Trisolaris (mass tiny ⇒ a test particle)
+    const bodies = [];
+
+    function makeBody(m) {
+      return { m, p: new THREE.Vector3(), v: new THREE.Vector3(), a: new THREE.Vector3() };
+    }
+
+    function computeAccelerations() {
+      for (const b of bodies) b.a.set(0, 0, 0);
+      const d = new THREE.Vector3();
+      for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+          d.subVectors(bodies[j].p, bodies[i].p);
+          const r2 = d.lengthSq() + SOFT2;
+          const inv = G / (r2 * Math.sqrt(r2));
+          bodies[i].a.addScaledVector(d,  inv * bodies[j].m);
+          bodies[j].a.addScaledVector(d, -inv * bodies[i].m);
+        }
+      }
+    }
+
+    function step() {
+      for (const b of bodies) {
+        b.p.addScaledVector(b.v, DT).addScaledVector(b.a, 0.5 * DT * DT);
+        b.v.addScaledVector(b.a, 0.5 * DT);   // half-kick with old a
+      }
+      computeAccelerations();
+      for (const b of bodies) b.v.addScaledVector(b.a, 0.5 * DT);
+      simTime += DT;
+    }
+
+    // The Chenciner–Montgomery figure-8 choreography, nudged a little. The
+    // perturbation is the whole point: the system starts as an elegant braid
+    // (a Stable Era) and slowly unravels into genuine chaos (a Chaotic Era).
+    function initSuns() {
+      const P = [[ 0.97000436, -0.24308753], [-0.97000436, 0.24308753], [0, 0]];
+      const V = [[ 0.46620369,  0.43236573], [ 0.46620369, 0.43236573], [-0.93240737, -0.86473146]];
+      const jiggle = () => 1 + (Math.random() - 0.5) * 0.03;
+      for (let i = 0; i < 3; i++) {
+        bodies[i].p.set(P[i][0], P[i][1], (Math.random() - 0.5) * 0.06);
+        bodies[i].v.set(V[i][0] * jiggle(), V[i][1] * jiggle(), (Math.random() - 0.5) * 0.03);
+      }
+      // re-zero total momentum so the trio doesn't drift off camera
+      const mom = new THREE.Vector3();
+      let M = 0;
+      for (let i = 0; i < 3; i++) { mom.addScaledVector(bodies[i].v, bodies[i].m); M += bodies[i].m; }
+      for (let i = 0; i < 3; i++) bodies[i].v.addScaledVector(mom, -1 / M);
+    }
+
+    // Drop Trisolaris onto a circumtrinary orbit, picking the launch angle
+    // that starts it farthest from any sun (a fair start for the new civilization).
+    function seedPlanet() {
+      const b = bodies[3];
+      const r = 3.3 + Math.random() * 0.9;
+      const incl = (Math.random() - 0.5) * 0.35;
+      let best = null, bestScore = -Infinity;
+      for (let k = 0; k < 12; k++) {
+        const th = (k / 12) * Math.PI * 2;
+        const p = new THREE.Vector3(r * Math.cos(th), r * Math.sin(th), 0)
+          .applyAxisAngle(new THREE.Vector3(1, 0, 0), incl);
+        const score = Math.min(...bodies.slice(0, 3).map(s => p.distanceTo(s.p)));
+        if (score > bestScore) { bestScore = score; best = th; }
+      }
+      const orbitV = Math.sqrt(G * 3 / r);   // circular speed around total mass ≈ 3
+      b.p.set(r * Math.cos(best), r * Math.sin(best), 0);
+      b.v.set(-orbitV * Math.sin(best), orbitV * Math.cos(best), 0);
+      b.p.applyAxisAngle(new THREE.Vector3(1, 0, 0), incl);
+      b.v.applyAxisAngle(new THREE.Vector3(1, 0, 0), incl);
+      trails[3].clear();
+    }
+
+    // ── Scene ──────────────────────────────────────────────────────────────
+    const container = document.getElementById('space');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 400);
+    camera.position.set(0, 4.5, 11);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.04;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.35;
+    controls.minDistance = 4;
+    controls.maxDistance = 40;
+    controls.enablePan = false;
+
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.15, 0.7, 0.12);
+    composer.addPass(bloom);
+
+    // soft radial glow texture, shared by all coronas
+    function glowTexture() {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 128;
+      const ctx = cv.getContext('2d');
+      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      g.addColorStop(0,    'rgba(255,255,255,1)');
+      g.addColorStop(0.25, 'rgba(255,255,255,0.45)');
+      g.addColorStop(0.6,  'rgba(255,255,255,0.12)');
+      g.addColorStop(1,    'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(cv);
+    }
+    const GLOW = glowTexture();
+
+    const sunMeshes = [], coronas = [], sunLights = [];
+    for (const s of SUN_STYLES) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.14, 32, 16),
+        new THREE.MeshBasicMaterial({ color: s.core })
+      );
+      const corona = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: GLOW, color: s.corona, transparent: true, opacity: 0.7,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }));
+      corona.scale.setScalar(1.1);
+      const light = new THREE.PointLight(s.corona, 14, 0, 2);
+      scene.add(mesh, corona, light);
+      sunMeshes.push(mesh); coronas.push(corona); sunLights.push(light);
+    }
+
+    const planetMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 24, 12),
+      new THREE.MeshStandardMaterial({ color: '#9fb8ab', roughness: 0.9 })
+    );
+    scene.add(planetMesh);
+
+    // distant starfield — a dim shell so bloom leaves it alone
+    {
+      const N = 1600, posArr = new Float32Array(N * 3);
+      for (let i = 0; i < N; i++) {
+        const v = new THREE.Vector3().randomDirection().multiplyScalar(90 + Math.random() * 90);
+        posArr.set([v.x, v.y, v.z], i * 3);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+        color: '#3c4156', size: 0.5, sizeAttenuation: true, depthWrite: false,
+      })));
+    }
+
+    // ── Trails — the chaos drawn as fading ribbons of light ───────────────
+    class Trail {
+      constructor(color, maxLen) {
+        this.maxLen = maxLen;
+        this.points = [];
+        this.tint = new THREE.Color(color);
+        this.geo = new THREE.BufferGeometry();
+        this.geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(maxLen * 3), 3));
+        this.geo.setAttribute('color',    new THREE.BufferAttribute(new Float32Array(maxLen * 3), 3));
+        this.line = new THREE.Line(this.geo, new THREE.LineBasicMaterial({
+          vertexColors: true, transparent: true,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+          toneMapped: false,   // let trail heads stay HDR-bright so bloom grabs them
+        }));
+        this.line.frustumCulled = false;
+        scene.add(this.line);
+      }
+      push(p) {
+        this.points.push(p.x, p.y, p.z);
+        if (this.points.length > this.maxLen * 3) this.points.splice(0, 3);
+      }
+      clear() { this.points.length = 0; }
+      // additive blending means "fade to black" reads as "fade to transparent"
+      update() {
+        const n = this.points.length / 3;
+        const pos = this.geo.attributes.position.array;
+        const col = this.geo.attributes.color.array;
+        pos.set(this.points);
+        for (let i = 0; i < n; i++) {
+          const f = Math.pow(i / Math.max(n - 1, 1), 1.6) * 1.25;  // oldest → dimmest; head nudged into bloom without washing out
+          col[i * 3]     = this.tint.r * f;
+          col[i * 3 + 1] = this.tint.g * f;
+          col[i * 3 + 2] = this.tint.b * f;
+        }
+        this.geo.setDrawRange(0, n);
+        this.geo.attributes.position.needsUpdate = true;
+        this.geo.attributes.color.needsUpdate = true;
+      }
+    }
+
+    const trails = [
+      new Trail(SUN_STYLES[0].trail, 2000),
+      new Trail(SUN_STYLES[1].trail, 2000),
+      new Trail(SUN_STYLES[2].trail, 2000),
+      new Trail(PLANET_TRAIL, 900),
+    ];
+
+    // ── The story layer — eras, civilizations, catastrophes ───────────────
+    const eraEl    = document.getElementById('tri-era');
+    const civEl    = document.getElementById('tri-civ-num');
+    const civAgeEl = document.getElementById('tri-civ-age');
+    const evtEl    = document.getElementById('tri-event');
+
+    let civilization = parseInt(localStorage.getItem('trisolaris-civ'), 10) || 137;
+    civEl.textContent = civilization;
+
+    // chronicle of fallen civilizations — number, lifespan, cause — persisted
+    // so the page accumulates its own history across visits
+    const YEARS_PER_TIME_UNIT = 100;   // narrative scale: one sim unit ≈ a century
+    let chronicle = [];
+    try { chronicle = JSON.parse(localStorage.getItem('trisolaris-chronicle')) || []; } catch {}
+    let civStartedAt = 0;
+
+    const chronEl = document.getElementById('tri-chronicle');
+    const CAUSE_TAGS = { fire: 'tag--fire', ice: 'tag--ice', 'three suns': 'tag--fire', syzygy: 'tag--syzygy' };
+
+    function renderChronicle() {
+      if (!chronicle.length) {
+        chronEl.innerHTML = '<li class="chron-empty">None yet — this sky is young.</li>';
+        return;
+      }
+      chronEl.innerHTML = [...chronicle].reverse().slice(0, 12).map(c => `
+        <li>
+          <span class="chron-n">№ ${c.n}</span>
+          <span class="chron-yrs">${c.yrs.toLocaleString('en-GB')} yrs</span>
+          <span class="chron-cause ${CAUSE_TAGS[c.cause] || ''}">${c.cause}</span>
+        </li>`).join('');
+    }
+
+    function recordFall(causeKey) {
+      const yrs = Math.max(1, Math.round((simTime - civStartedAt) * YEARS_PER_TIME_UNIT));
+      chronicle.push({ n: civilization, yrs, cause: causeKey });
+      if (chronicle.length > 40) chronicle.splice(0, chronicle.length - 40);
+      localStorage.setItem('trisolaris-chronicle', JSON.stringify(chronicle));
+      renderChronicle();
+    }
+
+    let simTime = 0;
+    let era = 'Stable';
+    let eraChangedAt = 0;
+    let graceUntil = 0;        // no catastrophes right after a (re)start
+    let lastSyzygyAt = -Infinity;
+    let evtTimer = null;
+
+    function announce(text, hold = 6000) {
+      evtEl.textContent = text;
+      evtEl.classList.add('is-visible');
+      clearTimeout(evtTimer);
+      evtTimer = setTimeout(() => evtEl.classList.remove('is-visible'), hold);
+    }
+
+    function setEra(next) {
+      if (era === next || simTime - eraChangedAt < 4) return;
+      era = next;
+      eraChangedAt = simTime;
+      eraEl.textContent = era + ' Era';
+      eraEl.classList.toggle('is-chaotic', era === 'Chaotic');
+    }
+
+    function catastrophe(causeKey, message) {
+      recordFall(causeKey);
+      civilization += 1;
+      localStorage.setItem('trisolaris-civ', civilization);
+      announce(message);
+      civEl.textContent = civilization;
+      seedPlanet();
+      civStartedAt = simTime;
+      graceUntil = simTime + 8;
+    }
+
+    // a sun slingshotted out of frame — start the whole dance over
+    function resetSystem() {
+      announce('A sun escaped into the deep. The dance begins anew.');
+      initSuns();
+      seedPlanet();
+      for (const t of trails) t.clear();
+      graceUntil = simTime + 8;
+    }
+
+    function checkNarrative() {
+      const suns = bodies.slice(0, 3);
+      const planet = bodies[3];
+
+      // era: a tight trio far below the planet's orbit acts like a single
+      // sun (Stable); a scattered trio means the sky is unpredictable (Chaotic)
+      let spread = 0;
+      for (let i = 0; i < 3; i++)
+        for (let j = i + 1; j < 3; j++)
+          spread = Math.max(spread, suns[i].p.distanceTo(suns[j].p));
+      const dCoM = planet.p.length();
+      if (spread < dCoM * 0.5)      setEra('Stable');
+      else if (spread > dCoM * 0.68) setEra('Chaotic');
+
+      for (const s of suns) {
+        if (s.p.length() > 30) { resetSystem(); return; }
+      }
+
+      if (simTime < graceUntil) return;
+
+      const d = suns.map(s => planet.p.distanceTo(s.p));
+      const dmin = Math.min(...d);
+
+      if (dmin < 0.4) {
+        catastrophe('fire', `Civilization ${civilization} was destroyed by fire.`);
+        return;
+      }
+      if (dmin > 26 || planet.p.length() > 30) {
+        catastrophe('ice', `Civilization ${civilization} froze in an endless night.`);
+        return;
+      }
+      if (d.every(x => x < 2.5)) {
+        catastrophe('three suns', `Three suns rose at once. Civilization ${civilization} burned.`);
+        return;
+      }
+      // tri-solar syzygy: the suns collinear in Trisolaris's sky
+      if (simTime - lastSyzygyAt > 20) {
+        const u = suns.map(s => s.p.clone().sub(planet.p).normalize());
+        if (Math.abs(u[0].dot(u[1])) > 0.9985 &&
+            Math.abs(u[0].dot(u[2])) > 0.9985 &&
+            Math.abs(u[1].dot(u[2])) > 0.9985) {
+          lastSyzygyAt = simTime;
+          catastrophe('syzygy', `Tri-solar syzygy. Civilization ${civilization} was torn from the surface.`);
+        }
+      }
+    }
+
+    // ── Surface temperature ────────────────────────────────────────────────
+    // Equilibrium temperature from the live stellar flux at the planet:
+    // T ∝ (Σ mᵢ/dᵢ²)^¼, calibrated so mid-orbit under the gathered trio ≈ 15 °C.
+    const TEMP_REF_K = 288;
+    const FLUX_REF = 3 / (3.75 * 3.75);
+    const tempEl = document.getElementById('tri-temp');
+    const tempNumEl = document.getElementById('tri-temp-num');
+    let tempC = 15;
+
+    function surfaceTempC() {
+      let flux = 0;
+      for (let i = 0; i < 3; i++) {
+        flux += bodies[i].m / (bodies[3].p.distanceToSquared(bodies[i].p) + 0.01);
+      }
+      return TEMP_REF_K * Math.pow(flux / FLUX_REF, 0.25) - 273.15;
+    }
+
+    function updateTempDisplay() {
+      tempNumEl.textContent = Math.round(tempC);
+      tempEl.classList.toggle('is-cold', tempC < -15);
+      tempEl.classList.toggle('is-hot',  tempC > 45);
+    }
+
+    // ── Controls ───────────────────────────────────────────────────────────
+    let speed = 1, running = true;
+    const speedEl = document.getElementById('tri-speed');
+    const pauseEl = document.getElementById('tri-pause');
+    speedEl.addEventListener('input', () => { speed = parseFloat(speedEl.value); });
+    function togglePause() {
+      running = !running;
+      pauseEl.textContent = running ? '⏸' : '▶';
+    }
+    pauseEl.addEventListener('click', togglePause);
+
+    const infoCard = document.getElementById('tri-info');
+    document.getElementById('tri-info-btn').addEventListener('click',
+      () => infoCard.classList.toggle('is-open'));
+    document.getElementById('tri-info-close').addEventListener('click',
+      () => infoCard.classList.remove('is-open'));
+
+    // ── Ambient sound ──────────────────────────────────────────────────────
+    // A slowly breathing generative piece in D, three layers deep:
+    //   pad    — constant foundation: open fifths (D2·A2·D3·A3·D4), each voice
+    //            a pair of oscillators detuned ±2.4 cents so they beat at
+    //            ~0.2 Hz, plus a whisper of low-passed brown noise.
+    //   bass   — two deep triangle subs (D1, A1) that swell in and out on
+    //            long mismatched LFO cycles (47 s / 33 s) so the low end keeps
+    //            drifting; the whole layer fades up over the first minute.
+    //   chimes — sparse high D-major tones with slow blooms and long decays,
+    //            trailing off through a damped feedback-delay shimmer.
+    // Everything shares the same key, so it can't clash; a compressor on the
+    // output keeps the stacked layers from ever clipping. Starts muted:
+    // browsers require a gesture.
+    let audio = null;
+
+    function buildAudio() {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -18;   // gentle glue, not a squash — lets the
+      compressor.ratio.value = 4;         // bass swells keep their full shape
+      compressor.knee.value = 24;
+      compressor.attack.value = 0.1;      // slow enough not to pump on the lows
+      compressor.release.value = 0.4;
+      compressor.connect(ctx.destination);
+      const master = ctx.createGain();
+      master.gain.value = 0;
+      master.connect(compressor);
+
+      // pad — levels lean on the mids: the low voices are felt on good
+      // speakers but laptop speakers can't reproduce them at all
+      for (const [freq, level] of [[73.42, 0.5], [110, 0.4], [146.83, 0.38], [220, 0.22], [293.66, 0.1]]) {
+        for (const cents of [-2.4, 2.4]) {
+          const osc = ctx.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          osc.detune.value = cents;
+          const g = ctx.createGain();
+          g.gain.value = level / 2;
+          osc.connect(g).connect(master);
+          osc.start();
+        }
+      }
+
+      const len = ctx.sampleRate * 4;
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < len; i++) {        // brown noise — random walk
+        last = (last + (Math.random() * 2 - 1) * 0.02) * 0.995;
+        data[i] = last * 3.5;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buf;
+      noise.loop = true;
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = 320;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.value = 0.07;   // barely-there texture under the pad
+      noise.connect(lowpass).connect(noiseGain).connect(master);
+      noise.start();
+
+      // bass swells — triangles so their harmonics (110/183 Hz…) carry the
+      // swell on small speakers while the fundamentals rumble on big ones
+      const bassLayer = ctx.createGain();
+      const t0 = ctx.currentTime;
+      bassLayer.gain.setValueAtTime(0, t0);
+      bassLayer.gain.setTargetAtTime(1, t0 + 6, 18);   // ≈ full after a minute
+      bassLayer.connect(master);
+
+      for (const [freq, level, period] of [[36.71, 1.3, 47], [55.0, 0.9, 33]]) {
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        const swell = ctx.createGain();
+        swell.gain.value = level * 0.5;          // centre of the swell
+        const lfo = ctx.createOscillator();      // near-silence ↔ full, slowly
+        lfo.frequency.value = 1 / period;
+        const lfoAmount = ctx.createGain();
+        lfoAmount.gain.value = level * 0.48;
+        lfo.connect(lfoAmount).connect(swell.gain);
+        osc.connect(swell).connect(bassLayer);
+        osc.start();
+        lfo.start();
+      }
+
+      // shimmer — a damped feedback delay the chimes echo away through
+      const shimmer = ctx.createDelay(2);
+      shimmer.delayTime.value = 0.6;
+      const shimmerDamp = ctx.createBiquadFilter();
+      shimmerDamp.type = 'lowpass';
+      shimmerDamp.frequency.value = 1600;
+      const shimmerFeedback = ctx.createGain();
+      shimmerFeedback.gain.value = 0.45;
+      shimmer.connect(shimmerDamp).connect(shimmerFeedback).connect(shimmer);
+      const shimmerWet = ctx.createGain();
+      shimmerWet.gain.value = 0.6;
+      shimmer.connect(shimmerWet).connect(master);
+
+      // chimes — D4 F#4 A4 B4 D5 F#5 A5: chord tones plus the sixth for colour
+      const CHIME_FREQS = [293.66, 369.99, 440, 493.88, 587.33, 739.99, 880];
+      function playChime(time) {
+        const f = CHIME_FREQS[(Math.random() * CHIME_FREQS.length) | 0];
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = f;
+        osc.detune.value = (Math.random() - 0.5) * 6;
+        const g = ctx.createGain();
+        const peak = (0.05 + Math.random() * 0.05) * (f > 600 ? 0.65 : 1);
+        const attack = 1.2 + Math.random() * 1.8;
+        g.gain.setValueAtTime(0, time);
+        g.gain.linearRampToValueAtTime(peak, time + attack);
+        g.gain.setTargetAtTime(0, time + attack, 2.5);
+        osc.connect(g);
+        g.connect(master);
+        g.connect(shimmer);
+        osc.start(time);
+        osc.stop(time + attack + 14);
+      }
+      (function chimeLoop() {
+        if (soundOn) playChime(ctx.currentTime + 0.05);
+        setTimeout(chimeLoop, 4000 + Math.random() * 8000);
+      })();
+
+      return { ctx, master };
+    }
+
+    let soundOn = false;
+    const soundEl = document.getElementById('tri-sound');
+    const volEl = document.getElementById('tri-vol');
+    const controlsEl = document.querySelector('.tri-controls');
+
+    let volume = parseFloat(localStorage.getItem('trisolaris-vol'));
+    if (isNaN(volume)) volume = 0.5;
+    volEl.value = volume;
+    const masterLevel = () => volume * 0.5;   // slider midpoint = the old default
+
+    soundEl.addEventListener('click', async () => {
+      if (!audio) audio = buildAudio();
+      await audio.ctx.resume();
+      soundOn = !soundOn;
+      const t = audio.ctx.currentTime;
+      audio.master.gain.cancelScheduledValues(t);
+      audio.master.gain.setTargetAtTime(soundOn ? masterLevel() : 0, t, soundOn ? 1.5 : 0.4);
+      soundEl.classList.toggle('is-on', soundOn);
+      controlsEl.classList.toggle('sound-on', soundOn);
+    });
+
+    volEl.addEventListener('input', () => {
+      volume = parseFloat(volEl.value);
+      localStorage.setItem('trisolaris-vol', volume);
+      if (audio && soundOn) {
+        audio.master.gain.setTargetAtTime(masterLevel(), audio.ctx.currentTime, 0.1);
+      }
+    });
+
+    addEventListener('keydown', e => {
+      if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); togglePause(); }
+      if (e.key === 'Escape') infoCard.classList.remove('is-open');
+    });
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      composer.setSize(innerWidth, innerHeight);
+    });
+
+    // ── Boot & main loop ───────────────────────────────────────────────────
+    // ±1% mass asymmetry is what breaks the braid: the figure-8 choreography is
+    // robust to (symmetric) velocity nudges but fragile to unequal masses.
+    // Headless sweeps: chaos onset reliably at t ≈ 20–26 (≈ 25 s of stable braid
+    // at speed 1), a sun escaping — full reset — after ~2–5 minutes.
+    for (const m of [1.0, 0.99, 1.01]) bodies.push(makeBody(m));
+    bodies.push(makeBody(1e-4));   // Trisolaris — effectively a test particle
+    initSuns();
+    seedPlanet();
+    computeAccelerations();
+    renderChronicle();
+    announce(`Civilization ${civilization} dawns under three suns.`);
+
+    let stepAccum = 0, substepCount = 0, uiTick = 0;
+
+    renderer.setAnimationLoop((t) => {
+      if (running && speed > 0) {
+        stepAccum += SUBSTEPS_PER_FRAME * speed;
+        while (stepAccum >= 1) {
+          step();
+          stepAccum -= 1;
+          if (++substepCount % TRAIL_EVERY === 0) {
+            for (let i = 0; i < 4; i++) trails[i].push(bodies[i].p);
+          }
+        }
+        checkNarrative();
+        tempC += (surfaceTempC() - tempC) * 0.06;   // smoothed — weather, not noise
+      }
+      if (++uiTick % 8 === 0) {
+        updateTempDisplay();
+        const age = Math.round((simTime - civStartedAt) * YEARS_PER_TIME_UNIT);
+        civAgeEl.textContent = ` · ${age.toLocaleString('en-GB')} yrs`;
+      }
+
+      for (let i = 0; i < 3; i++) {
+        sunMeshes[i].position.copy(bodies[i].p);
+        coronas[i].position.copy(bodies[i].p);
+        sunLights[i].position.copy(bodies[i].p);
+        // a slow asynchronous breathing of each corona
+        coronas[i].scale.setScalar(1.1 + 0.08 * Math.sin(t * 0.0011 + i * 2.4));
+      }
+      planetMesh.position.copy(bodies[3].p);
+      for (const tr of trails) tr.update();
+
+      controls.update();
+      composer.render();
+    });
+  </script>
+</body>
+</html>
