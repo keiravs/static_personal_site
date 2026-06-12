@@ -7,6 +7,7 @@
     'projects.html':  '#fde8dc',
     'contact.html':   '#dceef8',
     'flights.html':   '#05060a',
+    'trisolaris.html': '#030208',
   };
 
   function ease(t) {
@@ -15,6 +16,7 @@
 
   function makeCanvas(zIndex) {
     const cv = document.createElement('canvas');
+    cv.className = 'iris-canvas';
     cv.style.cssText = `position:fixed;inset:0;width:100%;height:100%;z-index:${zIndex};pointer-events:none;`;
     cv.width = window.innerWidth;
     cv.height = window.innerHeight;
@@ -69,6 +71,16 @@
     irisOpen(pageColor);
 
     let leaving = false;
+
+    // Back/forward-cache restores the page exactly as it was mid-exit: covered
+    // by the solid iris canvas, with `leaving` stuck true. Clean up and replay
+    // the entrance so the Back button lands on a working page.
+    window.addEventListener('pageshow', e => {
+      if (!e.persisted) return;
+      leaving = false;
+      document.querySelectorAll('canvas.iris-canvas').forEach(c => c.remove());
+      irisOpen(pageColor);
+    });
     document.querySelectorAll('a[href]').forEach(a => {
       const href = a.getAttribute('href');
       if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('http')) return;
