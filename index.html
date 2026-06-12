@@ -50,6 +50,14 @@
     (function () {
       let navigating = false;
 
+      // Back/forward-cache restores the page as it was mid-exit: covered by the
+      // expanded card overlay, with `navigating` stuck true. Clean up on restore.
+      window.addEventListener('pageshow', e => {
+        if (!e.persisted) return;
+        navigating = false;
+        document.querySelectorAll('.card-exit-overlay').forEach(el => el.remove());
+      });
+
       document.querySelectorAll('.card').forEach(card => {
         card.addEventListener('click', e => {
           e.preventDefault();
@@ -61,6 +69,7 @@
           const bg = getComputedStyle(card).backgroundColor;
 
           const overlay = document.createElement('div');
+          overlay.className = 'card-exit-overlay';
           Object.assign(overlay.style, {
             position: 'fixed',
             top: rect.top + 'px',
