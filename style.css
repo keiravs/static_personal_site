@@ -690,7 +690,10 @@ body.flights-full {
   margin-top: 0.4rem;
 }
 
-/* On narrow screens the panel becomes a bottom sheet */
+/* Drag handle — only shown on the mobile bottom sheet */
+.sheet-handle { display: none; }
+
+/* On narrow screens the panel becomes a draggable bottom sheet */
 @media (max-width: 700px) {
   .globe-panel {
     top: auto;
@@ -698,7 +701,370 @@ body.flights-full {
     right: 0;
     bottom: 0;
     width: auto;
-    max-height: 52vh;
+    max-height: 80vh;
+    padding-top: 0.75rem;
     border-radius: 1.25rem 1.25rem 0 0;
+    /* JS sets --sheet-y to slide the sheet down to a snap point */
+    transform: translateY(var(--sheet-y, 0px));
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* while a finger is dragging, follow it 1:1 with no easing */
+  .globe-panel.is-dragging { transition: none; }
+
+  .sheet-handle {
+    display: block;
+    flex: none;
+    width: 42px;
+    height: 5px;
+    margin: 0 auto 0.85rem;
+    border-radius: 999px;
+    background: rgba(245, 245, 247, 0.35);
+    cursor: grab;
+    touch-action: none;          /* let JS own the vertical drag gesture */
+  }
+  .sheet-handle:active { cursor: grabbing; }
+}
+
+/* ============================================================
+   TRISOLARIS — immersive full-page three-body simulation
+   ============================================================ */
+
+body.trisolaris-full {
+  background: radial-gradient(circle at 50% 40%, #0c0916 0%, #030208 70%);
+  color: #f5f5f7;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.trisolaris-full #space {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+}
+
+/* Compact frosted chip — era, civilization counter, event line */
+.tri-panel {
+  position: fixed;
+  z-index: 4;
+  left: 1.5rem;
+  bottom: 1.5rem;
+  max-width: min(420px, calc(100vw - 3rem));
+  padding: 1.1rem 1.4rem;
+  border-radius: 1.1rem;
+  background: rgba(10, 8, 18, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  pointer-events: none;          /* purely informational — clicks reach the scene */
+}
+
+.tri-era {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.8rem;
+  line-height: 1.1;
+  color: var(--mint);
+  transition: color 0.8s ease;
+}
+
+.tri-era.is-chaotic { color: var(--peach); }
+
+.tri-civ {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(245, 245, 247, 0.55);
+  margin-top: 0.35rem;
+}
+
+.tri-event {
+  font-size: 0.85rem;
+  font-weight: 300;
+  color: var(--lavender);
+  margin-top: 0.6rem;
+  min-height: 1.2em;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.tri-event.is-visible { opacity: 1; }
+
+/* Live surface temperature — shivers when icy, wavers when sweltering */
+.tri-temp {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+  color: rgba(245, 245, 247, 0.85);
+  transition: color 0.8s ease;
+}
+
+.tri-temp-num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.tri-temp-unit {
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.tri-temp.is-cold { color: #a5d8f3; }
+.tri-temp.is-cold .tri-temp-num {
+  animation: tri-shiver 0.16s infinite;
+  text-shadow: 0 0 14px rgba(140, 200, 240, 0.5);
+}
+.tri-temp.is-cold .tri-temp-num::before { content: '❄ '; font-size: 0.8em; }
+
+.tri-temp.is-hot { color: #ffa173; }
+.tri-temp.is-hot .tri-temp-num {
+  animation: tri-swelter 0.55s ease-in-out infinite;
+  text-shadow: 0 0 16px rgba(255, 120, 60, 0.6);
+}
+
+@keyframes tri-shiver {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-1px, 1px); }
+  50%  { transform: translate(1px, -1px); }
+  75%  { transform: translate(-1px, -1px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes tri-swelter {
+  0%, 100% { transform: translateY(0) skewX(0); }
+  30%      { transform: translateY(-1.5px) skewX(3deg); }
+  65%      { transform: translateY(1px) skewX(-3deg); }
+}
+
+/* Slide-in info card — context + the glossary of civilization endings */
+.tri-info {
+  position: fixed;
+  z-index: 6;
+  top: 5.5rem;
+  right: 1.5rem;
+  width: 350px;
+  max-width: calc(100vw - 3rem);
+  max-height: calc(100vh - 11rem);
+  overflow-y: auto;
+  padding: 1.6rem 1.5rem;
+  border-radius: 1.1rem;
+  background: rgba(10, 8, 18, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transform: translateX(calc(100% + 2rem));
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tri-info.is-open { transform: none; }
+
+.tri-info::-webkit-scrollbar { width: 6px; }
+.tri-info::-webkit-scrollbar-track { background: transparent; }
+.tri-info::-webkit-scrollbar-thumb {
+  background: rgba(196, 184, 234, 0.3);
+  border-radius: 999px;
+}
+
+.tri-info h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.4rem;
+  font-weight: 400;
+  margin-bottom: 0.8rem;
+  padding-right: 1.5rem;
+}
+
+.tri-info p {
+  font-size: 0.84rem;
+  font-weight: 300;
+  line-height: 1.6;
+  color: rgba(245, 245, 247, 0.78);
+  margin-bottom: 0.85rem;
+}
+
+.tri-info strong { font-weight: 500; color: #f5f5f7; }
+
+.tri-info-close {
+  position: absolute;
+  top: 1rem;
+  right: 1.1rem;
+  border: none;
+  background: none;
+  color: rgba(245, 245, 247, 0.6);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tri-info-close:hover { color: #fff; }
+
+.tri-endings {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.95rem;
+}
+
+.tri-endings li {
+  font-size: 0.8rem;
+  font-weight: 300;
+  line-height: 1.5;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.tri-ending-tag {
+  display: block;
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+
+.tag--fire   { color: #f4bfa3; }
+.tag--ice    { color: #a9cdec; }
+.tag--syzygy { color: #c4b8ea; }
+.tag--reset  { color: #ddf0e8; }
+
+/* Chronicle of fallen civilizations */
+.tri-chron-title {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(245, 245, 247, 0.5);
+  margin: 1.1rem 0 0.55rem;
+}
+
+.tri-chronicle {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.95rem;
+}
+
+.tri-chronicle li {
+  display: grid;
+  grid-template-columns: 3.4rem 1fr auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.78rem;
+  font-weight: 300;
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.chron-n { color: rgba(245, 245, 247, 0.45); }
+
+.chron-cause { font-weight: 500; }
+
+.chron-empty {
+  font-style: italic;
+  color: rgba(245, 245, 247, 0.45);
+}
+
+.tri-hint {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(245, 245, 247, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.9rem;
+}
+
+.tri-btn--info {
+  width: 1.45rem;
+  height: 1.45rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(245, 245, 247, 0.35);
+  border-radius: 999px;
+  font-family: 'DM Serif Display', serif;
+  font-style: italic;
+  font-size: 0.8rem;
+  padding: 0;
+}
+
+/* Ambient-sound toggle — dim when muted, lavender glow when playing */
+.tri-btn--sound { opacity: 0.4; }
+
+.tri-btn--sound.is-on {
+  opacity: 1;
+  color: #c4b8ea;
+  text-shadow: 0 0 9px rgba(196, 184, 234, 0.65);
+}
+
+/* Volume slider only exists while sound is on — keeps the pill minimal */
+.tri-vol {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0 0 0 -0.75rem;   /* collapse the flex gap it would otherwise leave */
+  accent-color: #c4b8ea;
+  cursor: pointer;
+  transition: width 0.35s ease, opacity 0.35s ease, margin-left 0.35s ease;
+}
+
+.tri-controls.sound-on .tri-vol {
+  width: 64px;
+  opacity: 1;
+  pointer-events: auto;
+  margin-left: 0;
+}
+
+/* Pause + speed, tucked into the opposite corner */
+.tri-controls {
+  position: fixed;
+  z-index: 4;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(10, 8, 18, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.tri-btn {
+  border: none;
+  background: none;
+  color: rgba(245, 245, 247, 0.75);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem;
+}
+
+.tri-btn:hover { color: #fff; }
+
+.tri-controls #tri-speed {
+  width: 110px;
+  accent-color: #c4b8ea;
+  cursor: pointer;
+}
+
+@media (max-width: 560px) {
+  .tri-panel {
+    left: 1rem;
+    bottom: 4.5rem;               /* clear the controls pill below */
+    padding: 0.9rem 1.1rem;
+  }
+  .tri-era { font-size: 1.45rem; }
+  .tri-controls { right: 1rem; bottom: 1rem; }
+  .tri-controls #tri-speed { width: 80px; }
+  .tri-info {
+    top: 4.5rem;
+    right: 1rem;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100vh - 12rem);
   }
 }
