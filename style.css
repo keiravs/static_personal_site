@@ -704,6 +704,7 @@ body.flights-full {
     max-height: 80vh;
     padding-top: 0.75rem;
     border-radius: 1.25rem 1.25rem 0 0;
+    animation: none;
     /* JS sets --sheet-y to slide the sheet down to a snap point */
     transform: translateY(var(--sheet-y, 0px));
     transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
