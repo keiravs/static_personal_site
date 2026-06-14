@@ -294,7 +294,12 @@
       // Re-measure once the routes list has populated (panel height changes).
       window.sheetReflow = () => { if (mq.matches) setState(state); };
 
-      apply();
+      // Collapse to the peek snap right away — don't wait for the fetch (which
+      // may fail) and don't leave the sheet at --sheet-y:0 covering the globe.
+      // measure() must run before the first apply() or every snap reads 0.
+      setState(mq.matches ? 'peek' : 'open');
+      // The header height (and thus the snaps) can shift once web fonts load.
+      window.addEventListener('load', () => { if (mq.matches) setState(state); });
     })();
 
     fetch(`${API_BASE}/api/flights/`)
@@ -310,6 +315,8 @@
       .catch(err => {
         document.getElementById('globe-loading').textContent =
           'Could not load flights — is the API running?';
+        // Even on failure, keep the sheet collapsed so it doesn't block the globe.
+        if (window.sheetReflow) window.sheetReflow();
         console.error(err);
       });
   </script>
