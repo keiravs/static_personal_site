@@ -237,6 +237,10 @@
 
       function apply() {
         panel.dataset.sheet = state;   // CSS keys list-scroll off the open state
+        // The handle/header scroll with the panel; when collapsed, pin the scroll
+        // to the top so the grip (not scrolled-to content) is the visible strip —
+        // otherwise the sheet looks cut off and the handle can't be grabbed.
+        if (state !== 'open') panel.scrollTop = 0;
         if (!mq.matches) { panel.style.removeProperty('--sheet-y'); return; }
         panel.style.setProperty('--sheet-y', snaps[state] + 'px');
       }
