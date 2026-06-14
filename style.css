@@ -701,30 +701,50 @@ body.flights-full {
     right: 0;
     bottom: 0;
     width: auto;
+    /* Cap the open height so the grab handle always clears the overlay navbar
+       (the sheet is anchored to the bottom, so a smaller height = lower top). */
     max-height: 80vh;
+    max-height: calc(100dvh - 7rem);
     padding-top: 0.75rem;
     border-radius: 1.25rem 1.25rem 0 0;
+    /* The fadeInUp intro animates transform and, with fill-mode `both`, would
+       pin it to translateY(0) — overriding the sheet slide below and leaving the
+       sheet stuck open. Disable it here; the sheet has its own transform. */
     animation: none;
     /* JS sets --sheet-y to slide the sheet down to a snap point */
     transform: translateY(var(--sheet-y, 0px));
     transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
+  /* Only let the content scroll when fully open; otherwise a drag-to-open
+     gesture gets swallowed by the scroller instead of moving the sheet. */
+  .globe-panel:not([data-sheet="open"]) { overflow-y: hidden; }
+
   /* while a finger is dragging, follow it 1:1 with no easing */
   .globe-panel.is-dragging { transition: none; }
+
+  /* The handle + the km header form the drag grip; the routes list below still
+     scrolls. touch-action:none lets JS own the vertical gesture on the grip. */
+  .sheet-handle,
+  .globe-panel-head {
+    touch-action: none;
+    cursor: grab;
+  }
+  .globe-panel.is-dragging .sheet-handle,
+  .globe-panel.is-dragging .globe-panel-head { cursor: grabbing; }
 
   .sheet-handle {
     display: block;
     flex: none;
     width: 42px;
     height: 5px;
-    margin: 0 auto 0.85rem;
+    /* generous tap target around the thin visual bar */
+    padding: 10px 0;
+    margin: -10px auto 0.4rem;
+    background-clip: content-box;
     border-radius: 999px;
-    background: rgba(245, 245, 247, 0.35);
-    cursor: grab;
-    touch-action: none;          /* let JS own the vertical drag gesture */
+    background-color: rgba(245, 245, 247, 0.35);
   }
-  .sheet-handle:active { cursor: grabbing; }
 }
 
 /* ============================================================
