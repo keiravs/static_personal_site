@@ -138,6 +138,8 @@
       world.controls().autoRotate = false;
       world.pointOfView({ lat: (a.lat + b.lat) / 2, lng: (a.lon + b.lon) / 2, altitude: 1.8 }, 800);
       renderRouteDetail(route);
+      // On mobile, drop the sheet out of the way so the focused route is visible.
+      if (window.sheetCollapse) window.sheetCollapse();
     }
 
     function renderStats(s) {
@@ -234,27 +236,32 @@
       }
 
       function apply() {
+        panel.dataset.sheet = state;   // CSS keys list-scroll off the open state
         if (!mq.matches) { panel.style.removeProperty('--sheet-y'); return; }
         panel.style.setProperty('--sheet-y', snaps[state] + 'px');
       }
 
       function setState(s) { state = s; measure(); apply(); }
 
+      // The drag grip is the handle + the km header; the routes list below still
+      // scrolls normally. Touching the grip starts a drag instead of a scroll.
+      const inGrip = t => handle.contains(t) || head.contains(t);
+
       // Drag handling via pointer events (covers touch + mouse).
       let dragging = false, moved = false, startY = 0, startOffset = 0;
 
-      handle.addEventListener('pointerdown', e => {
-        if (!mq.matches) return;
+      panel.addEventListener('pointerdown', e => {
+        if (!mq.matches || !inGrip(e.target)) return;
         dragging = true;
         moved = false;
         startY = e.clientY;
         measure();
         startOffset = snaps[state];
         panel.classList.add('is-dragging');
-        handle.setPointerCapture(e.pointerId);
+        panel.setPointerCapture(e.pointerId);
       });
 
-      handle.addEventListener('pointermove', e => {
+      panel.addEventListener('pointermove', e => {
         if (!dragging) return;
         if (Math.abs(e.clientY - startY) > 4) moved = true;
         const y = Math.min(snaps.bar, Math.max(0, startOffset + (e.clientY - startY)));
@@ -265,8 +272,8 @@
         if (!dragging) return;
         dragging = false;
         panel.classList.remove('is-dragging');
-        if (e && e.pointerId != null && handle.hasPointerCapture(e.pointerId)) {
-          handle.releasePointerCapture(e.pointerId);
+        if (e && e.pointerId != null && panel.hasPointerCapture(e.pointerId)) {
+          panel.releasePointerCapture(e.pointerId);
         }
         // Snap to whichever point the sheet ended up nearest.
         const y = parseFloat(getComputedStyle(panel).getPropertyValue('--sheet-y')) || 0;
@@ -277,15 +284,15 @@
         }
         setState(best);
       }
-      handle.addEventListener('pointerup', endDrag);
-      handle.addEventListener('pointercancel', endDrag);
+      panel.addEventListener('pointerup', endDrag);
+      panel.addEventListener('pointercancel', endDrag);
 
-      // Tapping the handle (no real drag) steps the sheet one notch upward.
+      // Tapping the handle (no real drag) cycles the sheet one notch, wrapping
+      // from open back to bar — an escape hatch if it's ever opened too far.
       handle.addEventListener('click', () => {
         if (!mq.matches || moved) return;
         const order = ['bar', 'peek', 'open'];
-        const next = order[Math.min(order.indexOf(state) + 1, order.length - 1)];
-        setState(next);
+        setState(order[(order.indexOf(state) + 1) % order.length]);
       });
 
       window.addEventListener('resize', () => { measure(); apply(); });
@@ -293,6 +300,9 @@
 
       // Re-measure once the routes list has populated (panel height changes).
       window.sheetReflow = () => { if (mq.matches) setState(state); };
+
+      // Let other code drop the sheet so a selected route is visible on the globe.
+      window.sheetCollapse = () => { if (mq.matches) setState('bar'); };
 
       // Collapse to the peek snap right away — don't wait for the fetch (which
       // may fail) and don't leave the sheet at --sheet-y:0 covering the globe.
